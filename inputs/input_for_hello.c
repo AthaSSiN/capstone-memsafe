@@ -12,8 +12,12 @@
 
 int main() {
   void *p = malloc(16);
-  void *q = p + 1;
+  // void *q = p + 1;
   free(p);
+  p = malloc(20);
+  void *q = malloc(30);
   free(p);
+  free(q);
+  free(q);
   return 0;
 }
