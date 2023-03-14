@@ -50,6 +50,7 @@ bool InjectFuncCall::runOnModule(Module &M) {
   bool updatedCode = false;
 
   auto &CTX = M.getContext();
+  const DataLayout& DL = M.getDataLayout();
 
   // STEP 1: Inject the declaration of check
   // ----------------------------------------
@@ -59,8 +60,9 @@ bool InjectFuncCall::runOnModule(Module &M) {
   // It corresponds to the following C declaration:
   //    void check(int *, ...)
 
-  Type *CheckArgTy = Type::getInt64PtrTy(CTX);
-
+  std::vector<Type*> CheckArgTy;
+  CheckArgTy.push_back(Type::getInt64PtrTy(CTX));
+  CheckArgTy.push_back(Type::getInt32Ty(CTX));
   FunctionType *CheckTy = FunctionType::get(
       Type::getVoidTy(CTX),
       CheckArgTy,
@@ -70,6 +72,7 @@ bool InjectFuncCall::runOnModule(Module &M) {
 
   Function *CheckF = dyn_cast<Function>(Check.getCallee());
   CheckF->addParamAttr(0, Attribute::NoUndef);
+  // CheckF->addParamAttr(1, Attribute::NoUndef);
 
   // STEP 2: Inject the declaration of tmalloc and malloc
   // ----------------------------------------
@@ -144,11 +147,50 @@ bool InjectFuncCall::runOnModule(Module &M) {
         if(isa<LoadInst>(I) or isa<StoreInst>(I)) {
           // errs() << I << "\n";
           IRBuilder<> Builder(&*I);
+
+          unsigned int bits = 0;
+          if(auto *LI = dyn_cast<LoadInst>(I)) {
+            Type* load_type = LI->getType();
+            if(load_type->isPointerTy()) {
+              bits =  DL.getPointerSize();
+            }
+            else {
+              bits = DL.getTypeSizeInBits(load_type);
+            }           
+          }
+          else {
+            Type* store_type = I->getOperand(0)->getType();
+            if(store_type->isPointerTy()) {
+              bits = DL.getPointerSize();
+            }
+            else { 
+              bits = DL.getTypeSizeInBits(store_type);
+            }           
+          }
+
+          auto *Operand = I->getOperand(isa<LoadInst>(I) ? 0 : 1);
+          auto *Bits = Builder.getInt32(bits);
           CallInst *CallCheck = Builder.CreateCall(
             Check, 
-            {I->getOperand(isa<LoadInst>(I) ? 0 : 1)}
+            {Operand, Bits}
           );
           CallCheck->addParamAttr(0, Attribute::NoUndef);
+
+          Value *longOperand = Builder.CreatePtrToInt(Operand, Type::getInt64Ty(CTX));
+          Value* temp_val = Builder.CreateAnd(longOperand, ConstantInt::get(Type::getInt64Ty(CTX), 0x3FFFFFFFFFFFFF));
+          Value* temp = Builder.CreateIntToPtr(temp_val, Type::getInt8PtrTy(CTX));
+
+          if(isa<LoadInst>(I)) {
+            LoadInst* new_load_inst = Builder.CreateLoad(Type::getInt8PtrTy(CTX), temp);
+            ReplaceInstWithInst(BB.getInstList(), I, new_load_inst);
+          }
+
+          else {
+            Value* store_value = I->getOperand(0);
+            StoreInst* new_store_inst = Builder.CreateStore(store_value, temp);
+            ReplaceInstWithInst(BB.getInstList(), I, new_store_inst);
+          }
+
           updatedCode = true;
         }
 
