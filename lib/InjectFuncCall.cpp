@@ -1,35 +1,3 @@
-//========================================================================
-// FILE:
-//    InjectFuncCall.cpp
-//
-// DESCRIPTION:
-//    For each function defined in the input IR module, InjectFuncCall inserts
-//    a call to printf (from the C standard I/O library). The injected IR code
-//    corresponds to the following function call in ANSI C:
-//    ```C
-//      printf("(llvm-tutor) Hello from: %s\n(llvm-tutor)   number of arguments: %d\n",
-//             FuncName, FuncNumArgs);
-//    ```
-//    This code is inserted at the beginning of each function, i.e. before any
-//    other instruction is executed.
-//
-//    To illustrate, for `void foo(int a, int b, int c)`, the code added by InjectFuncCall
-//    will generated the following output at runtime:
-//    ```
-//    (llvm-tutor) Hello World from: foo
-//    (llvm-tutor)   number of arguments: 3
-//    ```
-//
-// USAGE:
-//    1. Legacy pass manager:
-//      $ opt -load <BUILD_DIR>/lib/libInjectFuncCall.so `\`
-//        --legacy-inject-func-call <bitcode-file>
-//    2. New pass maanger:
-//      $ opt -load-pass-plugin <BUILD_DIR>/lib/libInjectFunctCall.so `\`
-//        -passes=-"inject-func-call" <bitcode-file>
-//
-// License: MIT
-//========================================================================
 #include "InjectFuncCall.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/IR/IRBuilder.h"
@@ -43,10 +11,16 @@ using namespace llvm;
 
 #define DEBUG_TYPE "inject-func-call"
 
-//-----------------------------------------------------------------------------
-// InjectFuncCall implementation
-//-----------------------------------------------------------------------------
 bool InjectFuncCall::runOnModule(Module &M) {
+
+  errs() << "After\n";
+
+  for(auto &F : M)
+  {
+    // if(!strcmp(F.getName().str().c_str(), "main"))
+    errs() << F << "\n";
+  }
+
   bool updatedCode = false;
 
   auto &CTX = M.getContext();
@@ -72,7 +46,6 @@ bool InjectFuncCall::runOnModule(Module &M) {
 
   Function *CheckF = dyn_cast<Function>(Check.getCallee());
   CheckF->addParamAttr(0, Attribute::NoUndef);
-  // CheckF->addParamAttr(1, Attribute::NoUndef);
 
   // STEP 2: Inject the declaration of tmalloc and malloc
   // ----------------------------------------
@@ -139,8 +112,6 @@ bool InjectFuncCall::runOnModule(Module &M) {
   FreeF->addParamAttr(0, Attribute::NoUndef);
 
   for (auto &F : M) {
-    if (strcmp(F.getName().str().c_str(), "main"))
-      continue;
     
     for(auto &BB : F) {
       for(auto I = BB.begin(), IE = BB.end(); I != IE; ++I) {
@@ -181,13 +152,12 @@ bool InjectFuncCall::runOnModule(Module &M) {
           Value* temp = Builder.CreateIntToPtr(temp_val, Type::getInt8PtrTy(CTX));
 
           if(isa<LoadInst>(I)) {
-            LoadInst* new_load_inst = Builder.CreateLoad(Type::getInt8PtrTy(CTX), temp);
+            LoadInst* new_load_inst = Builder.CreateLoad(I->getType(), temp);
             ReplaceInstWithInst(BB.getInstList(), I, new_load_inst);
           }
 
           else {
-            Value* store_value = I->getOperand(0);
-            StoreInst* new_store_inst = Builder.CreateStore(store_value, temp);
+            StoreInst* new_store_inst = Builder.CreateStore(I->getOperand(0), temp);
             ReplaceInstWithInst(BB.getInstList(), I, new_store_inst);
           }
 
@@ -236,8 +206,8 @@ bool InjectFuncCall::runOnModule(Module &M) {
 
   for(auto &F : M)
   {
-    if(!strcmp(F.getName().str().c_str(), "main"))
-      errs() << F << "\n";
+    // if(!strcmp(F.getName().str().c_str(), "main"))
+    errs() << F << "\n";
   }
 
   return updatedCode;

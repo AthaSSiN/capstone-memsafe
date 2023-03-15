@@ -50,15 +50,18 @@ extern "C" void check(void* p, unsigned int size) {
 
   if(rt[shadowMem[pt.meta.idx].node_id].parent == -1) {
     printf("Check: Use after free!\n");
-    abort();
+    // abort();
   }
 
   if(shadowMem[pt.meta.idx].cursor + shadowMem[pt.meta.idx].bounds < 
     (unsigned long)p + size / 8) {
-    printf("%lx + %lx, %lx\n", shadowMem[pt.meta.idx].cursor, shadowMem[pt.meta.idx].bounds, 
-    (unsigned long)p + size / 8);
-    printf("Check: Out of bounds access!\n");
-    abort();
+    printf("Check: Exceeds bounds!\n");
+    // abort();
+  }
+
+  if(shadowMem[pt.meta.idx].cursor > (unsigned long)p) {
+    printf("Check: Below cursor!\n");
+    // abort();
   }
 }
 
@@ -99,16 +102,22 @@ extern "C" void tfree(void* p) {
     
     if(rt[shadowMem[pt.meta.idx].node_id].parent != -1) {
 
-      printf("Freeable memory\n");
-      free((void*) pt.meta.loc);
-      rt[shadowMem[pt.meta.idx].node_id].parent = -1;
-      // shadowMem.erase(pt.meta.idx);
-      // free_idx.push_back(pt.meta.idx);
-      printf("Freed %lx\n", pt.meta.loc);
+      if(shadowMem[pt.meta.idx].cursor != pt.meta.loc) {
+        printf("Invalid pointer, can not free!\n");
+        // abort();
+      }
+
+      else {
+        printf("Freeable memory\n");
+        free((void*) pt.meta.loc);
+        rt[shadowMem[pt.meta.idx].node_id].parent = -1;
+        printf("Freed %lx\n", pt.meta.loc);
+      }
+      
     }
     else {
       printf("TFree: Already freed memory!\n");
-      abort();
+      // abort();
     }
   }
   else {

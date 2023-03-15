@@ -12,17 +12,14 @@ Running
 ```bash
 make -j8 # if you modify the pass
 clang -O0 -emit-llvm -c ../inputs/input_for_hello.c -o input_for_hello.bc
+opt -load-pass-plugin lib/libInjectFuncCall.so --passes inject-func-call input_for_hello.bc -o instrumented.bin
 clang++ -O0 -emit-llvm -c ../inputs/check.cpp -o check.bc
-llvm-link input_for_hello.bc check.bc -o out.bc
-opt -load-pass-plugin lib/libInjectFuncCall.so --passes inject-func-call out.bc -o instrumented.bin
-lli instrumented.bin 
+llvm-link instrumented.bin check.bc -o out.bin
+lli out.bin 
 ```
 
 llvm-tutor
 =========
-[![Build Status](https://github.com/banach-space/llvm-tutor/workflows/x86-Ubuntu/badge.svg?branch=main)](https://github.com/banach-space/llvm-tutor/actions?query=workflow%3Ax86-Ubuntu+branch%3Amain)
-[![Build Status](https://github.com/banach-space/llvm-tutor/workflows/x86-Darwin/badge.svg?branch=main)](https://github.com/banach-space/llvm-tutor/actions?query=workflow%3Ax86-Darwin+branch%3Amain)
-
 
 Example LLVM passes - based on **LLVM 15**
 
