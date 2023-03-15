@@ -36,7 +36,7 @@ bool InjectFuncCall::runOnModule(Module &M) {
 
   std::vector<Type*> CheckArgTy;
   CheckArgTy.push_back(Type::getInt64PtrTy(CTX));
-  CheckArgTy.push_back(Type::getInt32Ty(CTX));
+  CheckArgTy.push_back(Type::getInt64Ty(CTX));
   FunctionType *CheckTy = FunctionType::get(
       Type::getVoidTy(CTX),
       CheckArgTy,
@@ -119,9 +119,9 @@ bool InjectFuncCall::runOnModule(Module &M) {
           // errs() << I << "\n";
           IRBuilder<> Builder(&*I);
 
-          unsigned int bits = 0;
-          if(auto *LI = dyn_cast<LoadInst>(I)) {
-            Type* load_type = LI->getType();
+          unsigned long bits = 0;
+          if(isa<LoadInst>(I)) {
+            Type* load_type = I->getType();
             if(load_type->isPointerTy()) {
               bits =  DL.getPointerSize();
             }
@@ -140,7 +140,7 @@ bool InjectFuncCall::runOnModule(Module &M) {
           }
 
           auto *Operand = I->getOperand(isa<LoadInst>(I) ? 0 : 1);
-          auto *Bits = Builder.getInt32(bits);
+          auto *Bits = Builder.getInt64(bits);
           CallInst *CallCheck = Builder.CreateCall(
             Check, 
             {Operand, Bits}

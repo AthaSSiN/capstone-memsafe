@@ -34,7 +34,7 @@ union LowFatPtr {
   } meta;
 };
 
-extern "C" void check(void* p, unsigned int size) {
+extern "C" void check(void* p, unsigned long size) {
 
   LowFatPtr pt = {p};
 
